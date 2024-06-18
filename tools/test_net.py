@@ -32,8 +32,8 @@ parser = argparse.ArgumentParser(description='PSMNet')
 parser.add_argument('-cfg', '--cfg', '--config',
                     default=None, help='config path')
 parser.add_argument(
-    '--data_path', default='./data/kitti/training', help='select model')
-parser.add_argument('--loadmodel', default=None, help='loading model')
+    '--data_path', default='/home/data/kitti/training', help='select model')
+parser.add_argument('--loadmodel', default='/home/data/DSGN_car_pretrained/finetune_53.tar', help='loading model')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
 parser.add_argument('--split_file', default='./data/kitti/val.txt',
@@ -44,8 +44,8 @@ parser.add_argument('--save_lidar', action='store_true',
                     help='if true, save the numpy file, not the png file')
 parser.add_argument('--save_depth_map', action='store_true',
                     help='if true, save the numpy file, not the png file')
-parser.add_argument('--btest', '-btest', type=int, default=None)
-parser.add_argument('--devices', '-d', type=str, default=None)
+parser.add_argument('--btest', '-btest', type=int, default=1)
+parser.add_argument('--devices', '-d', type=str, default='0')
 parser.add_argument('--tag', '-t', type=str, default='')
 parser.add_argument('--debug', action='store_true', default=False,
                     help='debug mode')
