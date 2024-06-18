@@ -91,7 +91,10 @@ class myImageFloder(data.Dataset):
     def __getitem__(self, index):
         left = self.left[index]
         right = self.right[index]
-        disp_L = self.disp_L[index]
+        if self.disp_L is not None:
+            disp_L = self.disp_L[index]
+        else:
+            disp_L = None
 
         image_index = int(left.split('/')[-1].split('.')[0])
         
@@ -117,11 +120,14 @@ class myImageFloder(data.Dataset):
 
         left_img = self.loader(left)
         right_img = self.loader(right)
-        if not self.flip_this_image:
-            dataL = self.dploader(disp_L)
+        if disp_L is not None:
+            if not self.flip_this_image:
+                dataL = self.dploader(disp_L)
+            else:
+                disp_R = disp_L[:-4] + '_r.npy'
+                dataL = self.dploader(disp_R)
         else:
-            disp_R = disp_L[:-4] + '_r.npy'
-            dataL = self.dploader(disp_R)
+            dataL = None
 
         # box labels
         if self.training or self.generate_target:
@@ -256,7 +262,10 @@ class myImageFloder(data.Dataset):
         left_img = F.pad(left_img,(0,left_pad, 0,top_pad),'constant',0)
         right_img = F.pad(right_img,(0,left_pad, 0,top_pad),'constant',0)
 
-        dataL = F.pad(torch.as_tensor(dataL), (0,left_pad, 0,top_pad), 'constant', -389.63037)
+        if dataL is not None:
+            dataL = F.pad(torch.as_tensor(dataL), (0,left_pad, 0,top_pad), 'constant', -389.63037)
+        else:
+            dataL = None
 
         outputs = [left_img, right_img, dataL, calib, calib_R]
 

@@ -32,7 +32,7 @@ parser = argparse.ArgumentParser(description='PSMNet')
 parser.add_argument('-cfg', '--cfg', '--config',
                     default=None, help='config path')
 parser.add_argument(
-    '--data_path', default='./data/kitti/training', help='select model')
+    '--data_path', default='./data/DrivingStereoSet', help='select model')
 parser.add_argument('--loadmodel', default='./data/DSGN_car_pretrained/finetune_53.tar', help='loading model')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
@@ -47,7 +47,7 @@ parser.add_argument('--save_depth_map', action='store_true',
 parser.add_argument('--btest', '-btest', type=int, default=1)
 parser.add_argument('--devices', '-d', type=str, default='0')
 parser.add_argument('--tag', '-t', type=str, default='')
-parser.add_argument('--debug', action='store_true', default=True,
+parser.add_argument('--debug', action='store_true', default=False,
                     help='debug mode')
 parser.add_argument('--debugnum', default=None, type=int,
                     help='debug mode')
@@ -106,7 +106,10 @@ class BatchCollator(object):
         transpose_batch = list(zip(*batch))
         l = torch.cat(transpose_batch[0], dim=0)
         r = torch.cat(transpose_batch[1], dim=0)
-        disp = torch.stack(transpose_batch[2], dim=0)
+        try:
+            disp = torch.stack(transpose_batch[2], dim=0)
+        except:
+            disp = None
         calib = transpose_batch[3]
         calib_R = transpose_batch[4]
         image_sizes = transpose_batch[5]
@@ -306,7 +309,10 @@ def main():
             if batch_idx * len(imgL) > args.debugnum:
                 break
 
-        imgL, imgR, gt_disp = imgL.cuda(), imgR.cuda(), gt_disp.cuda()
+        if gt_disp is not None:
+            imgL, imgR, gt_disp = imgL.cuda(), imgR.cuda(), gt_disp.cuda()
+        else:
+            imgL, imgR = imgL.cuda(), imgR.cuda()
 
         calibs_fu = torch.as_tensor([c.f_u for c in calib_batch])
         calibs_baseline = torch.as_tensor(
@@ -335,9 +341,10 @@ def main():
                     all_err += err
                     all_err_med += err_med
                 else:
-                    err, batch = error_estimating(pred_disp, gt_disp)
-                    print('>3px error: {} (batch {})'.format(err / batch, batch))
-                    all_err += err
+                    pass
+                    # err, batch = error_estimating(pred_disp, gt_disp)
+                    # print('>3px error: {} (batch {})'.format(err / batch, batch))
+                    # all_err += err
 
         if args.save_depth_map:
             for i in range(len(image_indexes)):

@@ -82,7 +82,8 @@ def dataloader(filepath, train_file, depth_disp=False, cfg=None, is_train=False,
     if depth_disp:
         disp_L = 'depth/'
     else:
-        disp_L = 'disparity/'
+        # disp_L = 'disparity/'
+        disp_L = None
 
     with open(train_file, 'r') as f:
         train_idx = [x.strip() for x in f.readlines()]
@@ -100,6 +101,10 @@ def dataloader(filepath, train_file, depth_disp=False, cfg=None, is_train=False,
 
     left_train = [filepath + '/' + left_fold + img + '.png' for img in train_idx]
     right_train = [filepath + '/' + right_fold + img + '.png' for img in train_idx]
-    disp_train_L = [filepath + '/' + disp_L + img + '.npy' for img in train_idx]
+
+    if depth_disp:
+        disp_train_L = [filepath + '/' + disp_L + img + '.npy' for img in train_idx]
+    else:
+        disp_train_L = None
 
     return left_train, right_train, disp_train_L
