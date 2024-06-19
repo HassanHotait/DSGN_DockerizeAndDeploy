@@ -35,6 +35,10 @@ class kitti_dataset(object):
             self.train_folder = './training'
             self.val_txt = './test.txt'
             self.val_folder = './testing'
+            # self.train_txt = './trainval.txt'
+            # self.train_folder = '.'
+            # self.val_txt = './test.txt'
+            # self.val_folder = '.'
 
         self.train_dataset = None
         self.val_dataset = None

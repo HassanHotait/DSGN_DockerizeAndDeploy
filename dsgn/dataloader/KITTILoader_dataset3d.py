@@ -43,7 +43,7 @@ def convert_to_ry_torch(alpha, z, x):
 
 class myImageFloder(data.Dataset):
     def __init__(self, left, right, left_disparity, training, loader=default_loader, dploader=disparity_loader, 
-            split=None, cfg=None, generate_target=False):
+            split=None, cfg=None, generate_target=False,data_path=None):
         self.left = left
         self.right = right
         self.disp_L = left_disparity
@@ -54,14 +54,16 @@ class myImageFloder(data.Dataset):
         self.num_classes = self.cfg.num_classes
         self.num_angles = self.cfg.num_angles
 
+        
+
         if 'train.txt' in split:
-            self.kitti_dataset = kitti_dataset('train').train_dataset
+            self.kitti_dataset = kitti_dataset('train',data_path=os.path.join(data_path,'..')).train_dataset
         elif 'val.txt' in split:
-            self.kitti_dataset = kitti_dataset('train').val_dataset
+            self.kitti_dataset = kitti_dataset('train',os.path.join(data_path,'..')).val_dataset
         elif 'trainval.txt' in split:
-            self.kitti_dataset = kitti_dataset('trainval').train_dataset
+            self.kitti_dataset = kitti_dataset('trainval',os.path.join(data_path,'..')).train_dataset
         elif 'test.txt' in split:
-            self.kitti_dataset = kitti_dataset('trainval').val_dataset
+            self.kitti_dataset = kitti_dataset('trainval',os.path.join(data_path,'..')).val_dataset
 
         self.generate_target = generate_target
         self.save_path = './outputs/temp/anchor_{}angles'.format(self.cfg.num_angles)

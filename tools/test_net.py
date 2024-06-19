@@ -32,7 +32,7 @@ parser = argparse.ArgumentParser(description='PSMNet')
 parser.add_argument('-cfg', '--cfg', '--config',
                     default=None, help='config path')
 parser.add_argument(
-    '--data_path', default='./data/DrivingStereoSet', help='select model')
+    '--data_path', default='./data/DrivingStereoSet/training', help='select model')
 parser.add_argument('--loadmodel', default='./data/DSGN_car_pretrained/finetune_53.tar', help='loading model')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
@@ -42,7 +42,7 @@ parser.add_argument('--save_path', type=str, default='./outputs/result', metavar
                     help='path to save the predict')
 parser.add_argument('--save_lidar', action='store_true',
                     help='if true, save the numpy file, not the png file')
-parser.add_argument('--save_depth_map', action='store_true',
+parser.add_argument('--save_depth_map', default=True,action='store_true',
                     help='if true, save the numpy file, not the png file')
 parser.add_argument('--btest', '-btest', type=int, default=1)
 parser.add_argument('--devices', '-d', type=str, default='0')
@@ -118,7 +118,7 @@ class BatchCollator(object):
         return outputs
 
 ImageFloader = DA.myImageFloder(
-    all_left_img, all_right_img, all_left_disp, False, split=args.split_file, cfg=cfg)
+    all_left_img, all_right_img, all_left_disp, False, split=args.split_file, cfg=cfg,data_path=args.data_path)
 
 TestImgLoader = torch.utils.data.DataLoader(
     ImageFloader,
@@ -342,9 +342,9 @@ def main():
                     all_err_med += err_med
                 else:
                     pass
-                    # err, batch = error_estimating(pred_disp, gt_disp)
-                    # print('>3px error: {} (batch {})'.format(err / batch, batch))
-                    # all_err += err
+                    err, batch = error_estimating(pred_disp, gt_disp)
+                    print('>3px error: {} (batch {})'.format(err / batch, batch))
+                    all_err += err
 
         if args.save_depth_map:
             for i in range(len(image_indexes)):

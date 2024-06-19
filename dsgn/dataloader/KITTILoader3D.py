@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 from dsgn.dataloader.kitti_dataset import kitti_dataset as kittidataset
 
@@ -75,7 +76,7 @@ def is_image_file(filename):
     return any(filename.endswith(extension) for extension in IMG_EXTENSIONS)
 
 def dataloader(filepath, train_file, depth_disp=False, cfg=None, is_train=False, generate_target=False):
-    kitti_dataset = kittidataset('trainval').train_dataset
+    kitti_dataset = kittidataset('trainval',data_path=os.path.join(filepath,'..')).train_dataset
 
     left_fold = 'image_2/'
     right_fold = 'image_3/'
