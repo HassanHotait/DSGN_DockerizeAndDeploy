@@ -1,3 +1,4 @@
+# %%
 from __future__ import print_function
 
 import argparse
@@ -17,6 +18,7 @@ import skimage.transform
 import numpy as np
 import time
 import math
+import cv2
 from dsgn.models import *
 from dsgn.utils.numpy_utils import *
 from dsgn.utils.numba_utils import *
@@ -29,16 +31,14 @@ from dsgn.models.inference3d import make_fcos3d_postprocessor
 import scipy.misc as ssc
 
 parser = argparse.ArgumentParser(description='PSMNet')
-parser.add_argument('-cfg', '--cfg', '--config',
-                    default=None, help='config path')
-parser.add_argument(
-    '--data_path', default='./data/DrivingStereoSet/training', help='select model')
-parser.add_argument('--loadmodel', default='./data/DSGN_car_pretrained/finetune_53.tar', help='loading model')
+parser.add_argument('-cfg', '--cfg', '--config',default=None, help='config path')
+parser.add_argument('--data_path', default='/home/DSGN_DockerizeAndDeploy/data/kitti/training', help='select model')
+parser.add_argument('--loadmodel', default='/home/DSGN_DockerizeAndDeploy/data/DSGN_car_pretrained/finetune_53.tar', help='loading model')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
-parser.add_argument('--split_file', default='./data/kitti/val.txt',
+parser.add_argument('--split_file', default='/home/DSGN_DockerizeAndDeploy/data/kitti/val.txt',
                     help='split file')
-parser.add_argument('--save_path', type=str, default='./outputs/result', metavar='S',
+parser.add_argument('--save_path', type=str, default='/home/DSGN_DockerizeAndDeploy/outputs', metavar='S',
                     help='path to save the predict')
 parser.add_argument('--save_lidar', action='store_true',
                     help='if true, save the numpy file, not the png file')
@@ -53,6 +53,7 @@ parser.add_argument('--debugnum', default=None, type=int,
                     help='debug mode')
 parser.add_argument('--train', '-train', action='store_true', default=False,
                     help='test on train set')
+sys.argv = [''] # Workaround for interactive window
 args = parser.parse_args()
 
 if not args.devices:
@@ -76,7 +77,7 @@ if args.debug:
     cfg.debug = True
     args.tag += 'debug{}'.format(args.debugnum)
 else:
-    num_workers = 12
+    num_workers = 0
 
 if args.train:
     args.split_file = './data/kitti/train.txt'
@@ -122,7 +123,7 @@ ImageFloader = DA.myImageFloder(
 
 TestImgLoader = torch.utils.data.DataLoader(
     ImageFloader,
-    batch_size=args.btest, shuffle=False, num_workers=num_workers, drop_last=False,
+    batch_size=args.btest, shuffle=False, num_workers=num_workers, drop_last=False,pin_memory=True,
     collate_fn=BatchCollator())
 
 model = StereoNet(cfg=cfg)
@@ -284,103 +285,110 @@ def project_disp_to_depth(calib, disp, max_high, baseline=0.54, depth_disp=False
     return cloud[valid]
 
 
-def main():
-    if not os.path.isdir(args.save_path):
-        os.makedirs(args.save_path)
+# def main():
+if not os.path.isdir(args.save_path):
+    os.makedirs(args.save_path)
 
-    output_path = os.path.join(os.path.dirname(os.path.abspath(
-        __file__)), '..', os.path.dirname(args.loadmodel))
-    if not os.path.exists(output_path + '/kitti_output' + args.tag):
-        os.makedirs(output_path + '/kitti_output' + args.tag)
+output_path = os.path.join(os.path.dirname(os.path.abspath(
+    __file__)), '..', os.path.dirname(args.loadmodel))
+if not os.path.exists(output_path + '/kitti_output' + args.tag):
+    os.makedirs(output_path + '/kitti_output' + args.tag)
+else:
+    os.system('rm -rf {}/*'.format(output_path + '/kitti_output' + args.tag))
+
+all_err = 0.
+all_err_med = 0.
+
+stat = []
+
+for batch_idx, databatch \
+        in enumerate(TestImgLoader):
+
+    imgL, imgR, gt_disp, calib_batch, calib_R_batch, image_sizes, image_indexes = databatch
+
+    if cfg.debug:
+        if batch_idx * len(imgL) > args.debugnum:
+            break
+
+    if gt_disp is not None:
+        imgL, imgR, gt_disp = imgL.cuda(), imgR.cuda(), gt_disp.cuda()
     else:
-        os.system('rm -rf {}/*'.format(output_path + '/kitti_output' + args.tag))
+        imgL, imgR = imgL.cuda(), imgR.cuda()
 
-    all_err = 0.
-    all_err_med = 0.
+    calibs_fu = torch.as_tensor([c.f_u for c in calib_batch])
+    calibs_baseline = torch.as_tensor(
+        [(c.P[0, 3] - c_R.P[0, 3]) / c.P[0, 0] for c, c_R in zip(calib_batch, calib_R_batch)])
+    calibs_Proj = torch.as_tensor([c.P for c in calib_batch])
+    calibs_Proj_R = torch.as_tensor([c.P for c in calib_R_batch])
 
-    stat = []
-
-    for batch_idx, databatch \
-            in enumerate(TestImgLoader):
-
-        imgL, imgR, gt_disp, calib_batch, calib_R_batch, image_sizes, image_indexes = databatch
-
-        if cfg.debug:
-            if batch_idx * len(imgL) > args.debugnum:
-                break
-
-        if gt_disp is not None:
-            imgL, imgR, gt_disp = imgL.cuda(), imgR.cuda(), gt_disp.cuda()
-        else:
-            imgL, imgR = imgL.cuda(), imgR.cuda()
-
-        calibs_fu = torch.as_tensor([c.f_u for c in calib_batch])
-        calibs_baseline = torch.as_tensor(
-            [(c.P[0, 3] - c_R.P[0, 3]) / c.P[0, 0] for c, c_R in zip(calib_batch, calib_R_batch)])
-        calibs_Proj = torch.as_tensor([c.P for c in calib_batch])
-        calibs_Proj_R = torch.as_tensor([c.P for c in calib_R_batch])
-
-        start_time = time.time()
-        cfg.time = time.time()
-        output = test(imgL, imgR, image_sizes=image_sizes, calibs_fu=calibs_fu,
-                      calibs_baseline=calibs_baseline, calibs_Proj=calibs_Proj, calibs_Proj_R=calibs_Proj_R)
-        if cfg.RPN3D_ENABLE:
-            pred_disp, box_pred = output
-            kitti_output(box_pred[0], image_indexes, output_path + '/kitti_output' + args.tag)
-        else:
-            pred_disp, = output
-        print('time = %.2f' % (time.time() - start_time))
-
-        if getattr(cfg, 'PlaneSweepVolume', True) and getattr(cfg, 'loss_disp', True):
-            if len(pred_disp) > 0:
-                if cfg.eval_depth:
-                    err, batch, err_med = depth_error_estimating(pred_disp, gt_disp,
-                                                                 depth_disp=True, calib_batch=calib_batch, calib_R_batch=calib_R_batch)
-                    print('Mean depth error(m): {} Median(m): {} (batch {})'.format(
-                        err / batch, err_med / batch, batch))
-                    all_err += err
-                    all_err_med += err_med
-                else:
-                    pass
-                    err, batch = error_estimating(pred_disp, gt_disp)
-                    print('>3px error: {} (batch {})'.format(err / batch, batch))
-                    all_err += err
-
-        if args.save_depth_map:
-            for i in range(len(image_indexes)):
-                depth_map = project_disp_to_depth_map(calib_batch[i], pred_disp[i].cpu().numpy()[:image_sizes[i][0], :image_sizes[i][1]], max_high=1., baseline=(calib_batch[i].P[0, 3] - calib_R_batch[i].P[0, 3]) / calib_batch[i].P[0, 0],
-                                                      depth_disp=True)
-                if not os.path.exists('{}/depth_maps/'.format(args.save_path)):
-                    os.makedirs('{}/depth_maps/'.format(args.save_path))
-                np.save('{}/depth_maps/{:06d}.npy'.format(args.save_path,
-                                                          image_indexes[i]), depth_map)
-
-        if args.save_lidar:
-            for i in range(len(image_indexes)):
-                lidar = project_disp_to_depth(calib_batch[i], pred_disp[i].cpu().numpy()[:image_sizes[i][0], :image_sizes[i][1]], max_high=1., baseline=(calib_batch[i].P[0, 3] - calib_R_batch[i].P[0, 3]) / calib_batch[i].P[0, 0],
-                                              depth_disp=True)
-                lidar = np.concatenate(
-                    [lidar, np.ones((lidar.shape[0], 1))], 1)
-                lidar = lidar.astype(np.float32)
-                lidar.tofile(
-                    '{}/{:06d}.bin'.format(args.save_path, image_indexes[i]))
-
-    stat = np.asarray(stat)
-
+    start_time = time.time()
+    cfg.time = time.time()
+    output = test(imgL, imgR, image_sizes=image_sizes, calibs_fu=calibs_fu,
+                    calibs_baseline=calibs_baseline, calibs_Proj=calibs_Proj, calibs_Proj_R=calibs_Proj_R)
     if cfg.RPN3D_ENABLE:
-        kitti_eval(output_path, args.loadmodel)
+        pred_disp, box_pred = output
+        kitti_output(box_pred[0], image_indexes, output_path + '/kitti_output' + args.tag)
+    else:
+        pred_disp, = output
+    print('time = %.2f' % (time.time() - start_time))
 
-    print(args.loadmodel)
-    all_err /= len(ImageFloader)
-    all_err_med /= len(ImageFloader)
+    if getattr(cfg, 'PlaneSweepVolume', True) and getattr(cfg, 'loss_disp', True):
+        if len(pred_disp) > 0:
+            if cfg.eval_depth:
+                err, batch, err_med = depth_error_estimating(pred_disp, gt_disp,
+                                                                depth_disp=True, calib_batch=calib_batch, calib_R_batch=calib_R_batch)
+                print('Mean depth error(m): {} Median(m): {} (batch {})'.format(
+                    err / batch, err_med / batch, batch))
+                break
+                # %%
+                all_err += err
+                all_err_med += err_med
+            else:
+                pass
+                err, batch = error_estimating(pred_disp, gt_disp)
+                print('>3px error: {} (batch {})'.format(err / batch, batch))
+                all_err += err
 
-    print("Mean Error", all_err)
-    os.system("echo Mean Error: {} >> {}/result_{}.txt".format(all_err,
-                                                               os.path.dirname(args.loadmodel), args.loadmodel.split('/')[-1].split('.')[0]))
-    if cfg.eval_depth:
-        print('Median Error', all_err_med)
-        os.system("echo Median Error: {} >> {}/result_{}.txt".format(all_err_med,
-                                                                     os.path.dirname(args.loadmodel), args.loadmodel.split('/')[-1].split('.')[0]))
 
-if __name__ == '__main__':
-    main()
+    if args.save_depth_map:
+        for i in range(len(image_indexes)):
+            depth_map = project_disp_to_depth_map(calib_batch[i], pred_disp[i].cpu().numpy()[:image_sizes[i][0], :image_sizes[i][1]], max_high=1., baseline=(calib_batch[i].P[0, 3] - calib_R_batch[i].P[0, 3]) / calib_batch[i].P[0, 0],
+                                                    depth_disp=True)
+            if not os.path.exists('{}/depth_maps/'.format(args.save_path)):
+                os.makedirs('{}/depth_maps/'.format(args.save_path))
+            np.save('{}/depth_maps/{:06d}.npy'.format(args.save_path,
+                                                        image_indexes[i]), depth_map)
+            norm_depth_map = cv2.normalize(depth_map, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+            cv2.imwrite('{}/depth_maps/{:06d}.png'.format(args.save_path,
+                                                        image_indexes[i]), cv2.applyColorMap(norm_depth_map, cv2.COLORMAP_JET))
+            
+
+    if args.save_lidar:
+        for i in range(len(image_indexes)):
+            lidar = project_disp_to_depth(calib_batch[i], pred_disp[i].cpu().numpy()[:image_sizes[i][0], :image_sizes[i][1]], max_high=1., baseline=(calib_batch[i].P[0, 3] - calib_R_batch[i].P[0, 3]) / calib_batch[i].P[0, 0],
+                                            depth_disp=True)
+            lidar = np.concatenate(
+                [lidar, np.ones((lidar.shape[0], 1))], 1)
+            lidar = lidar.astype(np.float32)
+            lidar.tofile(
+                '{}/{:06d}.bin'.format(args.save_path, image_indexes[i]))
+
+stat = np.asarray(stat)
+
+if cfg.RPN3D_ENABLE:
+    kitti_eval(output_path, args.loadmodel)
+
+print(args.loadmodel)
+all_err /= len(ImageFloader)
+all_err_med /= len(ImageFloader)
+
+print("Mean Error", all_err)
+os.system("echo Mean Error: {} >> {}/result_{}.txt".format(all_err,
+                                                            os.path.dirname(args.loadmodel), args.loadmodel.split('/')[-1].split('.')[0]))
+if cfg.eval_depth:
+    print('Median Error', all_err_med)
+    os.system("echo Median Error: {} >> {}/result_{}.txt".format(all_err_med,
+                                                                    os.path.dirname(args.loadmodel), args.loadmodel.split('/')[-1].split('.')[0]))
+
+# if __name__ == '__main__':
+#     main()

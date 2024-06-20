@@ -164,15 +164,15 @@ class Calibration(object):
             calibs = cls.read_calib_from_video(calib_filepath)
         else:
             calibs = cls.read_calib_file(calib_filepath)
-        # P = calibs['P2'] 
-        # V2C = calibs['Tr_velo_to_cam']
-        # R0 = calibs['R0_rect']
-        P = calibs['P_rect_101']
+        P = calibs['P2'] 
         V2C = calibs['Tr_velo_to_cam']
-        R0 = calibs['R_rect_101']
+        R0 = calibs['R0_rect']
+        # P = calibs['P_rect_101']
+        # V2C = calibs['Tr_velo_to_cam']
+        # R0 = calibs['R_rect_101']
 
-        #t_cam2_from_cam0 = (calibs['P2'][3] - calibs['P0'][3]) / P[0]
-        t_cam2_from_cam0 = calibs['T_103']
+        t_cam2_from_cam0 = (calibs['P2'][3] - calibs['P0'][3]) / P[0]
+        #t_cam2_from_cam0 = calibs['T_103']
         return cls(P, V2C, R0, t_cam2_from_cam0=t_cam2_from_cam0)
 
     @classmethod
@@ -181,16 +181,16 @@ class Calibration(object):
             calibs = cls.read_calib_from_video(calib_filepath)
         else:
             calibs = cls.read_calib_file(calib_filepath)
-        # P = calibs['P3'] 
-        # V2C = calibs['Tr_velo_to_cam']
-        # R0 = calibs['R0_rect']
-
-        P = calibs['P_rect_103']
+        P = calibs['P3'] 
         V2C = calibs['Tr_velo_to_cam']
-        R0 = calibs['R_rect_103']
+        R0 = calibs['R0_rect']
 
-        #t_cam2_from_cam0 = (calibs['P2'][3] - calibs['P0'][3]) / P[0]
-        t_cam2_from_cam0 = calibs['T_103']
+        # P = calibs['P_rect_103']
+        # V2C = calibs['Tr_velo_to_cam']
+        # R0 = calibs['R_rect_103']
+
+        t_cam2_from_cam0 = (calibs['P2'][3] - calibs['P0'][3]) / P[0]
+        #t_cam2_from_cam0 = calibs['T_103']
         return cls(P, V2C, R0, t_cam2_from_cam0=t_cam2_from_cam0)
 
     @classmethod
