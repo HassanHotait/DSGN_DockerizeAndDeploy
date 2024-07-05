@@ -339,7 +339,7 @@ for batch_idx, databatch \
                                                                 depth_disp=True, calib_batch=calib_batch, calib_R_batch=calib_R_batch)
                 print('Mean depth error(m): {} Median(m): {} (batch {})'.format(
                     err / batch, err_med / batch, batch))
-                break
+                # break
                 # %%
                 all_err += err
                 all_err_med += err_med
